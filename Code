@@ -1,0 +1,179 @@
+#include <Servo.h>         
+#define trigPin 6        // trig 핀 설정
+#define echoPin 5        // echo 핀 설정
+
+Servo servoLeft;          
+Servo servoRight;
+Servo servoMiddle;
+const int flame = 7; // 불꽃 감지 센서 핀 번호 7
+int state = 0; // 불꽃 감지 센서 상태값 저장 변수
+const int A1A = 8; // 워터펌프용 A1A 핀 번호 8
+const int A1B = 9; // 워터펌프용 A1B 핀 번호 9
+int angle = 0; // 불꽃감지센서가 달린 서보모터 회전각 저장 변수
+int i; //서보모터 탐지각 저장 변수
+float distance_f = 0; //distance 함수의 리턴값을 저장할 변수
+
+void setup()            
+{ 
+  pinMode(11, INPUT);  pinMode(10, OUTPUT);   // Left IR LED & Receiver
+  pinMode(3, INPUT);  pinMode(2, OUTPUT);    // Right IR LED & Receiver
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  digitalWrite(trigPin, LOW); //트리거핀 LOW로 초기화
+  pinMode(flame, INPUT); //불꽃 감지 센서 INPUT 설정
+  pinMode(A1A, OUTPUT); // A1A를 OUTPUT으로
+  pinMode(A1B, OUTPUT);
+  servoMiddle.attach(4);
+  servoMiddle.write(90); //모터 각도 90도로 설정
+  servoLeft.attach(13);       // Attach left signal to pin 13
+  servoRight.attach(12);     // Attach right signal to pin 12
+}  
+void loop()                 
+{   
+  int irLeft = irDetect(10, 11, 38000);// Check for object on left
+  int irRight = irDetect(2, 3, 38000); // Check for object on right
+  servoMiddle.attach(4);
+  servoLeft.detach(); //탐지하기 전 바퀴 정지
+  servoRight.detach();
+  detection(); //초음파로 장애물 탐지 및 화재 감지 함수
+  if((irLeft == 0) && (irRight == 0)) // Both sides see table surface
+  { 
+    maneuver(200, 200, 500); // 1초 전진 
+  }   
+  else if(irLeft == 0)            // Left OK, drop-off on right
+  { 
+    maneuver(-200, 200, 375); // 0.375초 좌회전
+  }  
+  else if(irRight == 0)          // Right OK, drop-off on left
+  { 
+    maneuver(200, -200, 375); // 0.375초 우회전  
+  }   
+  else                            // Drop-off straight ahead
+  { 
+    maneuver(-200, -200, 250); // 0.25초 후진
+  }   
+}
+//전학기 과제에서 가져옴
+int irDetect(int irLedPin, int irReceiverPin, long frequency)
+{
+  tone(irLedPin, frequency, 8);  // IRLED 38 kHz for at least 1 ms
+  delay(1);                      // Wait 1 ms
+  int ir = digitalRead(irReceiverPin); // IR receiver -> ir variable
+  delay(1);                     // Down time before recheck
+  return ir;                   // Return 1 no detect, 0 detect
+}  
+
+void maneuver(int speedLeft, int speedRight, int msTime) //ppt에서 가져옴
+{ 
+  servoLeft.writeMicroseconds(1500 + speedLeft);   //왼쪽 서보속도 설정
+  servoRight.writeMicroseconds(1500 - speedRight);   //오른쪽 서보속도 설정
+  if(msTime==-1)                // if msTime = -1
+  { 
+    servoLeft.detach();          // Stop servo signals
+    servoRight.detach();   
+  }
+  delay(msTime);                // Delay for msTime
+}
+
+float distance() // 초음파로 장애물과의 거리 탐지 함수
+{
+  float duration = 0, distance = 0; // echo펄스 도달시간, 거리 변수 선언
+  digitalWrite(trigPin, HIGH); // trigPin HIGH로 신호 발생
+  delay(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH); // pulseIn함수고 호출되고 펄스가 입력될 때까지의 시간
+  distance = duration/58.0; // cm로 환산
+  return distance; // 측정 거리값 리턴
+}
+
+void detection() // 초음파로 장애물 회피 주행 함수
+{
+  for(i=90; i<=150; i++){ //1.2초
+    servoMiddle.write(i);
+    delay(20);
+  }
+  float distance_l = distance(); // 왼쪽 거리 측정
+  state = digitalRead(flame);
+  if(state==0){
+    angle = servoMiddle.read(); // 불꽃을 감지했을 때 서보모터 각도 받아서 저장
+    servoLeft.attach(13);       
+    servoRight.attach(12); 
+    spinTime(angle); //감지했을 때의 각도만큼 몸체 회전
+    water(); //물 발사
+    delay(500);
+  }
+  for(i=150; i>=30; i--){ //2.4초
+    servoMiddle.write(i);
+    delay(20);
+  }
+  float distance_r = distance(); // 오른쪽 거리 측정
+  state = digitalRead(flame);
+  if(state==0){
+    angle = servoMiddle.read(); // 불꽃을 감지했을 때 서보모터 각도 받아서 저장
+    servoLeft.attach(13);       
+    servoRight.attach(12); 
+    spinTime(angle);
+    water();
+    delay(500);
+  }
+  for(i=30; i<=90; i++){ //1.2초
+    servoMiddle.write(i);
+    delay(20);
+  }
+  state = digitalRead(flame);
+  if(state==0){
+    angle = servoMiddle.read(); // 불꽃을 감지했을 때 서보모터 각도 받아서 저장
+    servoLeft.attach(13);       
+    servoRight.attach(12); 
+    spinTime(angle);
+    water();
+    delay(500);
+  }
+  float distance_f = distance();  
+  servoLeft.attach(13);       
+  servoRight.attach(12); 
+  if(distance_f <20){ //장애물이 20cm 이내에 있으면 회피
+    if(distance_r < 10 && distance_l < 10) //좌우 거리가 10cm 미만일 경우 우회전
+    {
+      maneuver(200, -200, 1080); // 우회전해서 뒤돌기
+    }
+    else if(distance_r >= distance_l) // 오른쪽 거리가 왼쪽 거리 이상일 때 우회전
+    {
+      maneuver(200, -200, 200); //우회전
+    }
+    else // 왼쪽 거리가 오른쪽 거리 초과일 때 좌회전
+    {
+      maneuver(-200, 200, 200); // 좌회전
+    }
+    delay(500);  
+  }
+}
+
+void water() // 물 발사 함수 구글에서 찾은 워터펌프 예제에서 가져옴
+{
+  digitalWrite(A1A, HIGH); 
+  digitalWrite(A1B, LOW);
+  delay(2000); // 물 1초 발사
+  digitalWrite(A1A, LOW);
+  digitalWrite(A1B, LOW);
+  delay(100); // 멈춤
+}
+// 풀스피드로 몸체 90도 회전시키는데 걸리는 시간 540
+//1도 돌리는데 걸리는 시간 540/90=6
+//angle*6 : 불꽃 감지된 방향까지 회전
+
+void spinTime(int angle) // 불꽃 감지 방향으로 회전
+{
+  maneuver(200, 200, 250); // 불꽃감지센서가 달린 서보모터와 양쪽 바퀴 중심부를 이은 선 사이의 거리(약 4.5cm)만큼 전진
+  if(angle <= 90) // 오른쪽에서 불꽃 감지
+  {
+    maneuver(200, -200, (90-angle)*6 ); //불꽃 감지된 방향으로 우회전
+  }
+  else // 오른쪽에서 불꽃 감지
+  {
+    maneuver(-200, 200, (angle-90)*6 ); //좌회전
+  }
+  servoMiddle.write(90);
+  servoLeft.detach();
+  servoRight.detach();
+}

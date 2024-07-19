@@ -12,6 +12,7 @@ ABOT에 양면 테이프를 이용해 브레드보드를 붙이고 그 위에 Ir
 Ir led에는 2k 저항 대신 4.7k 저항을 연결해 조금 더 가까운 것을 감지하게 함.
 서보모터에는 박스를 잘라서 만든 판과 양면 테이프를 이용해 초음파센서와 불꽃감지센서를 붙임.
 플라스틱 통에 모터드라이버를 붙이고 워터펌프모터를 넣어서 몸체에 양면 테이프로 붙였고 박스를 잘라 만든 발사대로 고무호스를 고정.
+
 ![image](https://github.com/user-attachments/assets/2178e5bd-6239-4e13-99b7-9539f76513d4)
 ![image](https://github.com/user-attachments/assets/5d39082b-7959-42f6-86ff-e7d5e87bb519)
 ![image](https://github.com/user-attachments/assets/857c9ed6-a052-42a9-bab3-931262cd1880)
